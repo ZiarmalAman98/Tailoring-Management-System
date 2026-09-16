@@ -1,0 +1,1 @@
+"""Tailoring Management System Windows desktop application."""
