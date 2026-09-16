@@ -4,7 +4,7 @@ import hashlib
 import json
 import os
 import secrets
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -175,34 +175,103 @@ def init_database() -> sessionmaker[Session]:
                     AppSetting(key="shop_name", value="د کارگاه"),
                 ]
             )
+
+        # Create a complete demo dataset only on a fresh database.
         if session.scalar(select(Customer).limit(1)) is None:
-            customer = Customer(
-                customer_number="CUS-000001",
-                name="مریم احمدي",
-                father_name="عبدالکریم",
-                phone="0700 123 456",
-                address="کابل، شهر نو",
-                gender="ښځینه",
-                notes="د لومړي ځل نمونه معلومات",
-            )
-            session.add(customer)
-            session.flush()
-            session.add(
-                Order(
-                    order_number="ORD-000001",
-                    customer_id=customer.id,
-                    garment="د ښځینه جامې",
-                    design="زرغون ګلدوزي",
-                    delivery_date=date.today(),
-                    status="د ګنډلو په مرحله کې",
-                    total=3200,
-                    paid=1400,
-                    assigned_tailor="زینب",
+            demo_customers = [
+                ("احمد خان", "محمد خان", "0700 100 001", "جلال آباد"),
+                ("فرید احمد", "عبدالله", "0700 100 002", "جلال آباد"),
+                ("رحیم الله", "حبیب الله", "0700 100 003", "بهسود"),
+                ("حمیدالله", "نورمحمد", "0700 100 004", "کامې"),
+                ("سعید احمد", "کریم", "0700 100 005", "سره رود"),
+                ("نعمت الله", "عبدالودود", "0700 100 006", "جلال آباد"),
+                ("محمود خان", "رحمت الله", "0700 100 007", "بټي کوټ"),
+                ("جاوید احمد", "حیات الله", "0700 100 008", "رودات"),
+                ("عبدالصبور", "عبدالکریم", "0700 100 009", "جلال آباد"),
+                ("شمس الرحمن", "غلام نبي", "0700 100 010", "کامه"),
+                ("مریم احمدي", "عبدالکریم", "0700 100 011", "جلال آباد"),
+                ("زینب خان", "محمد یوسف", "0700 100 012", "جلال آباد"),
+                ("سمیرا احمد", "نورالدین", "0700 100 013", "بهسود"),
+                ("فرشته رحماني", "عبدالحمید", "0700 100 014", "جلال آباد"),
+                ("لیلا محمدي", "عبدالحق", "0700 100 015", "سره رود"),
+                ("شګوفه خان", "احمد شاه", "0700 100 016", "جلال آباد"),
+                ("نازیه احمد", "عبدالودود", "0700 100 017", "کامه"),
+                ("مریم جان", "رحیم الله", "0700 100 018", "جلال آباد"),
+                ("رویا سعیدي", "حبیب الرحمن", "0700 100 019", "رودات"),
+                ("عایشه محمدي", "محمد نعیم", "0700 100 020", "جلال آباد"),
+            ]
+            garments = [
+                "شلوار کمیس", "سوټ", "کمیس", "پتلون", "کورتۍ",
+                "ښځینه جامې", "کوټ", "واسکټ", "شلوار کمیس", "سوټ",
+            ]
+            statuses = [
+                "نوی فرمایش", "د اندازه اخیستل شوې", "د پرې کولو په مرحله کې",
+                "د ګنډلو په مرحله کې", "د فټینګ په مرحله کې", "QC", "بشپړ شوی", "تحویل شوی",
+            ]
+            tailors = ["احمد", "فرید", "رحیم", "حمید", "سعید"]
+            for i, (name, father, phone, address) in enumerate(demo_customers, start=1):
+                gender = "ښځینه" if i > 10 else "نارینه"
+                customer = Customer(
+                    customer_number=f"CUS-{i:06d}",
+                    name=name,
+                    father_name=father,
+                    phone=phone,
+                    address=address,
+                    gender=gender,
+                    notes="نمونه معلومات (Demo)",
                 )
-            )
+                session.add(customer)
+                session.flush()
+
+                garment = garments[(i - 1) % len(garments)]
+                total = 1800 + ((i * 350) % 4200)
+                paid = total if i % 4 == 0 else round(total * (0.45 if i % 3 == 0 else 0.60), 2)
+                order = Order(
+                    order_number=f"ORD-{i:06d}",
+                    customer_id=customer.id,
+                    garment=garment,
+                    design=f"Demo Design {i}",
+                    delivery_date=date.today() + timedelta(days=(i % 14) + 1),
+                    status=statuses[(i - 1) % len(statuses)],
+                    total=total,
+                    paid=paid,
+                    assigned_tailor=tailors[(i - 1) % len(tailors)],
+                    notes="نمونه فرمایش د Demo لپاره",
+                )
+                session.add(order)
+                session.flush()
+
+                values = {
+                    "اوږدوالی": float(70 + (i % 8)),
+                    "سینه": float(90 + (i % 10)),
+                    "ملا": float(78 + (i % 9)),
+                    "اوږه": float(40 + (i % 5)),
+                    "آستین": float(58 + (i % 7)),
+                }
+                session.add(
+                    MeasurementProfile(
+                        customer_id=customer.id,
+                        garment_type=garment,
+                        unit="cm",
+                        values_json=json.dumps(values, ensure_ascii=False),
+                        measured_at=date.today(),
+                        notes="نمونه اندازه (Demo)",
+                    )
+                )
+                session.add(
+                    Payment(
+                        receipt_number=f"REC-{i:06d}",
+                        order_id=order.id,
+                        amount=paid,
+                        method="نغدې" if i % 2 else "بانکي",
+                        paid_at=datetime.utcnow(),
+                    )
+                )
+
             session.add_all(
                 [
                     InventoryItem(name="سپین لینن", category="ټوکر", quantity=28, unit="متر", minimum_quantity=10, supplier="کابل ټوکر"),
+                    InventoryItem(name="تور سوټ ټوکر", category="ټوکر", quantity=18, unit="متر", minimum_quantity=8, supplier="جلال آباد ټوکر"),
                     InventoryItem(name="د ګنډلو تار", category="لوازم", quantity=6, unit="قرطاسیه", minimum_quantity=8, supplier="مېرویس سنټر"),
                 ]
             )
