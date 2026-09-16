@@ -8,7 +8,7 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text, create_engine, select
+from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text, create_engine, select, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, relationship, sessionmaker
 
 
@@ -59,7 +59,7 @@ class MeasurementProfile(Base):
     values_json: Mapped[str] = mapped_column(Text, default="{}")
     measured_at: Mapped[date] = mapped_column(Date, default=date.today)
     notes: Mapped[str] = mapped_column(Text, default="")
-    customer: Mapped[Customer] = relationship(back_populates="measurements")
+    customer: Mapped[Customer] = relationship(back_populates="measurements", lazy="joined")
 
     @property
     def values(self) -> dict[str, float]:
@@ -90,7 +90,7 @@ class Order(Base):
     assigned_tailor: Mapped[str] = mapped_column(String(160), default="")
     notes: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    customer: Mapped[Customer] = relationship(back_populates="orders")
+    customer: Mapped[Customer] = relationship(back_populates="orders", lazy="joined")
 
     @property
     def remaining(self) -> float:
@@ -210,9 +210,7 @@ def init_database() -> sessionmaker[Session]:
 
 
 def next_number(session: Session, model: type[Any], prefix: str) -> str:
-    total = session.scalar(select(model).count()) if hasattr(select(model), "count") else None
-    if total is None:
-        total = len(session.scalars(select(model)).all())
+    total = session.scalar(select(func.count(model.id))) or 0
     return f"{prefix}-{int(total) + 1:06d}"
 
 
